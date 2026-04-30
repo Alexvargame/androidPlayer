@@ -1,6 +1,8 @@
 package com.example.musikplayer
 
 import android.os.Bundle
+import androidx.navigation.compose.rememberNavController
+
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -23,34 +25,84 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
-import androidx.core.app.ActivityCompat
-import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.util.Log
 
-import com.example.musikplayer.ui.cases.PlayTrackUseCase
-import com.example.musikplayer.ui.player_manager.PlayerManager
-import com.example.musikplayer.ui.repository.PlayerRepository
-import com.example.musikplayer.ui.theme.MusikPlayerTheme
+import com.example.musikplayer.cases.PlayTrackUseCase
+import com.example.musikplayer.data.AppDatabase
+import com.example.musikplayer.player_manager.PlayerManager
+import com.example.musikplayer.repository.PlayerRepository
+import com.example.musikplayer.ui.theme.MusicPlayerTheme
+import com.example.musikplayer.repository.MusicRepository
+
+import com.example.musikplayer.add_data.*
+import com.example.musikplayer.cases.GetPlaylistWithTracksUseCase
+import com.example.musikplayer.repository.PlaylistRepository
+import com.example.musikplayer.ui.navigation.appNavGraph
 
 
-import com.example.musikplayer.ui.screen.PlayerScreen
-import com.example.musikplayer.ui.viewModel.PlayerViewModel
+import com.example.musikplayer.viewModel.PlayerViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        Log.e("TEST", "APP STARTED")
+        Log.d("TEST_DB_PERMISSION_DEBUG", "onCreate START")
 
+//        val granted = checkPermission()
+//        Log.d("TEST_DB_PERMISSION_DEBUG", "GRANTED = $granted")
+//
+//        if (!granted) {
+//            Log.d("TEST_DB_PERMISSION_DEBUG", "REQUESTING PERMISSION")
+//            requestPermission()
+//        }
+//        if (Build.VERSION.SDK_INT >= 33) {
+//            requestPermissions(arrayOf(Manifest.permission.READ_MEDIA_VIDEO), 100)
+//        }
+        Read_tracks(this).readTracks()
+        Read_playlistts(this).readplaylists()
+
+        enableEdgeToEdge()
+//        if (!checkPermission()) {
+//            requestPermission() // CHANGED: добавлен runtime permission check
+//        }
+        val uri = when (intent?.action) {
+            Intent.ACTION_VIEW -> intent.data
+            Intent.ACTION_SEND -> intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+            else -> null
+        }
+        Log.d("TEST_DB_INTENT_DEBUG", "URI = $uri")
+        val db = AppDatabase.getInstance(this)
+        val musicRepository = MusicRepository(
+            db.playlistDao(),
+            db.trackDao(),
+            db.playlistTrackDao()
+        )
+        val playlistRepository = PlaylistRepository(
+            db.trackDao(),
+            db.playlistDao(),
+            db.playlistTrackDao()
+        )
         setContent {
-            MusikPlayerTheme {
+            MusicPlayerTheme {
+
+                val getPlaylistTracksUseCase = GetPlaylistWithTracksUseCase(playlistRepository)
                 val playerViewModel = PlayerViewModel(
                     useCase = PlayTrackUseCase(
                         repository = PlayerRepository(
                             playerManager = PlayerManager(this)
                         )
-                    )
+                    ),
+                    musicRepository = musicRepository,
+                    getPlaylistTracksUseCase = getPlaylistTracksUseCase
                 )
-
-                PlayerScreen(playerViewModel)
+                // 👉 ЕСЛИ ПРИШЁЛ ФАЙЛ — СРАЗУ ИГРАЕМ
+                if (uri != null) {
+                    playerViewModel.play(uri.toString())
+                }
+                val navController = rememberNavController()
+                appNavGraph(navController, playerViewModel)
             }
         }
     }
@@ -107,7 +159,7 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
-    MusikPlayerTheme {
+    MusicPlayerTheme {
         Greeting("Android")
     }
 }

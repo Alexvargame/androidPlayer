@@ -1,7 +1,7 @@
-package com.example.musikplayer.ui.cases
+package com.example.musikplayer.cases
 
 import androidx.media3.exoplayer.ExoPlayer
-import com.example.musikplayer.ui.repository.PlayerRepository
+import com.example.musikplayer.repository.PlayerRepository
 
 class PlayTrackUseCase(
     private val repository: PlayerRepository

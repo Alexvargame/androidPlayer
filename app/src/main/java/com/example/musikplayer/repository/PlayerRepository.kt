@@ -1,7 +1,7 @@
-package com.example.musikplayer.ui.repository
+package com.example.musikplayer.repository
 
 import androidx.media3.exoplayer.ExoPlayer
-import com.example.musikplayer.ui.player_manager.PlayerManager
+import com.example.musikplayer.player_manager.PlayerManager
 
 
 class PlayerRepository(

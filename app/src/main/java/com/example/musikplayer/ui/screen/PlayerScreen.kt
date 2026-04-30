@@ -3,17 +3,20 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -24,23 +27,31 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.ui.PlayerView
 
+import androidx.navigation.NavController
 
 
-import com.example.musikplayer.ui.viewModel.PlayerViewModel
+
+import com.example.musikplayer.viewModel.PlayerViewModel
+
 
 
 
 
 @Composable
 fun PlayerScreen(
-    playerViewModel: PlayerViewModel
+    navController: NavController,
+    playerViewModel: PlayerViewModel,
+    playlistId: Long? = null
 ) {
     val bg = Color(0xFF0F0F12)
     val card = Color(0xFF1C1C22)
     val accent = Color(0xFF1DB954)
     val context = LocalContext.current
 
-    var currentUri by remember { mutableStateOf("") }
+//    var currentUri by remember { mutableStateOf("") }
+    var currentUri by rememberSaveable { mutableStateOf("") }
+
+//    val playlistTracks = playerViewModel.getCurrentPlaylistTracks()
     val pickVideo = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -53,6 +64,12 @@ fun PlayerScreen(
             playerViewModel.play(uri.toString())
         }
     }
+    LaunchedEffect(playlistId) {
+        playlistId?.let {
+            playerViewModel.playPlaylist(it)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -67,6 +84,9 @@ fun PlayerScreen(
                     player = playerViewModel.player
                     useController = true
                 }
+            },
+            update = { view ->
+                view.player = playerViewModel.player
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -91,8 +111,43 @@ fun PlayerScreen(
             fontSize = 14.sp
         )
 
+        Button(
+            onClick = {
+                navController.navigate("playlist_screen")
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = card),
+            shape = RoundedCornerShape(50),
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text("📃 Плейлисты", color = Color.White)
+        }
         Spacer(Modifier.weight(1f))
-
+//        LazyColumn(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .height(200.dp)
+//        ) {
+//            items(playlistTracks) { track ->
+//                Row(
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .clickable {
+//                            // переключиться на выбранный трек
+//                            val newIndex = playlistTracks.indexOf(track)
+//                            if (newIndex != -1) {
+//                                // нужно добавить в ViewViewModel метод setCurrentIndex
+//                                playerViewModel.setCurrentIndex(newIndex)
+//                            }
+//                        }
+//                        .padding(8.dp)
+//                ) {
+//                    Text(
+//                        text = track.title,
+//                        color = if (track.uri == currentTrack?.uri) Color.Green else Color.White
+//                    )
+//                }
+//            }
+//        }
         // 🎛 Кнопки
         Row(
             modifier = Modifier
@@ -108,19 +163,13 @@ fun PlayerScreen(
                 Text("⏮", color = Color.White)
             }
 
-//            Button(
-//                onClick = { playerViewModel.toggle("file:///storage/emulated/0/DCIM/V.mp4")},
-//                colors = ButtonDefaults.buttonColors(containerColor = accent),
-//                shape = RoundedCornerShape(50)
-//            ) {
-//                Text(
-//                    if (playerViewModel.isPlaying.value) "⏸" else "▶"
-//                )
-//            }
 
-            // ▶/⏸ Play/Pause (с иконкой, которая меняется)
             Button(
-                onClick = { playerViewModel.toggle(currentUri) },
+                onClick = {
+                    if (currentUri.isNotEmpty()) {
+                        playerViewModel.toggle(currentUri)
+                    }
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = accent),
                 shape = RoundedCornerShape(50)
             ) {

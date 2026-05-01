@@ -72,11 +72,12 @@ dependencies {
     implementation("androidx.media3:media3-common:1.9.0")
 
 
-
     implementation("androidx.room:room-runtime:2.5.2")
     ksp("androidx.room:room-compiler:2.5.2")  // для аннотаций
     implementation("androidx.room:room-ktx:2.5.2") // Kotlin extensions
 
     implementation("androidx.navigation:navigation-compose:2.7.3")
+    implementation("androidx.compose.runtime:runtime")
+
 
 }

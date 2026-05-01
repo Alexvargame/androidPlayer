@@ -1,12 +1,13 @@
 package com.example.musikplayer.ui.screen
 import android.content.Intent
+import android.media.MediaMetadataRetriever
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -16,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.ui.PlayerView
+
+
 
 import androidx.navigation.NavController
 
@@ -50,8 +55,11 @@ fun PlayerScreen(
 
 //    var currentUri by remember { mutableStateOf("") }
     var currentUri by rememberSaveable { mutableStateOf("") }
+    val playlistTracks by playerViewModel.playlistTracks.collectAsState()
+    val currenttrackUri by playerViewModel.currentTrackUri.collectAsState()
 
-//    val playlistTracks = playerViewModel.getCurrentPlaylistTracks()
+    var singleTrackTitle by remember { mutableStateOf<String?>(null) }
+    var singleTrackArtist by remember { mutableStateOf<String?>(null) }
     val pickVideo = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -60,12 +68,29 @@ fun PlayerScreen(
                 uri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
+            playerViewModel.clearPlaylist()  // добавим этот метод ниже
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(context, uri)
+                val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                    ?: uri.lastPathSegment?.substringAfterLast('/') ?: "Unknown"
+                val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: "Unknown artist"
+                singleTrackTitle = title
+                singleTrackArtist = artist
+            } catch (e: Exception) {
+                singleTrackTitle = uri.lastPathSegment?.substringAfterLast('/') ?: "Unknown"
+                singleTrackArtist = "Unknown artist"
+            } finally {
+                retriever.release()
+            }
             currentUri = uri.toString()
             playerViewModel.play(uri.toString())
         }
     }
     LaunchedEffect(playlistId) {
         playlistId?.let {
+            singleTrackTitle = null
+            singleTrackArtist = null
             playerViewModel.playPlaylist(it)
         }
     }
@@ -94,22 +119,41 @@ fun PlayerScreen(
                 .clip(RoundedCornerShape(20.dp))
         )
 
+        if (playlistTracks.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+            ) {
+                items(playlistTracks) { track ->
+                    val isCurrent = track.uri == currenttrackUri
+                    Text(
+                        text = track.title,
+                        color = if(isCurrent) Color.Green else Color.White,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+            }
+        }
+        else {
+            Text(
+                text = singleTrackTitle ?: "Track name",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(
+                text = singleTrackArtist ?: "Artist name",
+                color = Color.Gray,
+                fontSize = 14.sp
+            )
+        }
         Spacer(Modifier.height(16.dp))
 
 
         // 🎵 Название трека
-        Text(
-            text = "Track name",
-            color = Color.White,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
 
-        Text(
-            text = "Artist name",
-            color = Color.Gray,
-            fontSize = 14.sp
-        )
 
         Button(
             onClick = {
@@ -122,32 +166,7 @@ fun PlayerScreen(
             Text("📃 Плейлисты", color = Color.White)
         }
         Spacer(Modifier.weight(1f))
-//        LazyColumn(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .height(200.dp)
-//        ) {
-//            items(playlistTracks) { track ->
-//                Row(
-//                    modifier = Modifier
-//                        .fillMaxWidth()
-//                        .clickable {
-//                            // переключиться на выбранный трек
-//                            val newIndex = playlistTracks.indexOf(track)
-//                            if (newIndex != -1) {
-//                                // нужно добавить в ViewViewModel метод setCurrentIndex
-//                                playerViewModel.setCurrentIndex(newIndex)
-//                            }
-//                        }
-//                        .padding(8.dp)
-//                ) {
-//                    Text(
-//                        text = track.title,
-//                        color = if (track.uri == currentTrack?.uri) Color.Green else Color.White
-//                    )
-//                }
-//            }
-//        }
+
         // 🎛 Кнопки
         Row(
             modifier = Modifier
@@ -156,7 +175,7 @@ fun PlayerScreen(
         ) {
 
             Button(
-                onClick = {},
+                onClick = { playerViewModel.prevTrack()},
                 colors = ButtonDefaults.buttonColors(containerColor = card),
                 shape = RoundedCornerShape(50)
             ) {
@@ -165,8 +184,13 @@ fun PlayerScreen(
 
 
             Button(
+
                 onClick = {
-                    if (currentUri.isNotEmpty()) {
+                    if (playlistTracks.isNotEmpty()) {
+                        // Режим плейлиста
+                        playerViewModel.togglePlayPause()
+                    } else if (currentUri.isNotEmpty()) {
+                        // Режим одиночного файла
                         playerViewModel.toggle(currentUri)
                     }
                 },
@@ -189,7 +213,7 @@ fun PlayerScreen(
             }
 
             Button(
-                onClick = {},
+                onClick = { playerViewModel.nextTrack()},
                 colors = ButtonDefaults.buttonColors(containerColor = card),
                 shape = RoundedCornerShape(50)
             ) {
